@@ -1,0 +1,9 @@
+dataset,method,makespan,p99
+Balanced,GCCS,1.0,1.0
+LongTail,GCCS,1.07,1.15
+Balanced,HEFT,1.22,1.22
+LongTail,HEFT,1.42,1.647
+Balanced,Hydra,1.12,1.12
+LongTail,Hydra,1.28,1.4000000000000001
+Balanced,MRSA,1.15,1.15
+LongTail,MRSA,1.32,1.472

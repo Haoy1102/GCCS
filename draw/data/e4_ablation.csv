@@ -1,0 +1,5 @@
+variant,makespan,p99
+Full,1.0,1.0
+No Dynamic vGPU,1.11,1.2
+No Min-Max Packing,1.18,1.28
+No Dynamic + No Packing,1.31,1.45
