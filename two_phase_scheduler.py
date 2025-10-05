@@ -19,7 +19,7 @@ import numpy as np
 from collections import defaultdict, deque
 
 # --------------- Paths & Config ---------------
-SEG_PATH = './input/segments_base.csv'   # 或 '/mnt/data_gen/segments_heavy.csv'
+SEG_PATH = 'input/segments.csv'  # 或 '/mnt/data_gen/segments_heavy.csv'
 EDG_PATH = './input/edges.csv'
 PHASE1   = 'lp'         # 'greedy' | 'relax' | 'lp'
 SEED     = 2025

@@ -1,12 +1,4 @@
 
-"""
-main.py
-Run all four algorithms from your IDE by pressing "Run" on main().
-- Algorithms live under ./algo
-- Shared utilities are in ./common.py
-- Input CSVs are expected in ./input: segments.csv & edges.csv
-- Outputs written to ./output/data
-"""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -25,20 +17,33 @@ ALGOS = {
 }
 
 def main():
-    # 1) load data
-    segments, edges = common.load_segments_edges()  # defaults to ./input/*
-    # 2) make a default cluster (replace with your real cluster if you like)
-    cluster = common.make_default_cluster(num_servers=6, rho=4.0, seed=2025)
-    # 3) run all algorithms
-    out_dir = Path("./output/data"); out_dir.mkdir(parents=True, exist_ok=True)
+    segments, edges = common.load_segments_edges()
+    # rho 自适应于本批 workload；kappa=4 作为常用值
+    cluster = common.make_default_cluster(num_servers=6, rho='auto', kappa=4, segments=segments, seed=2025)
+
+    out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
     rows=[]
-    for name, fn in ALGOS.items():
-        ms, per_srv = fn(segments, edges, cluster)
-        rows.append({"algorithm":name, "makespan":float(ms)})
-        (out_dir / f"{name}.json").write_text(json.dumps(per_srv, indent=2, ensure_ascii=False))
+
+    # GCCS
+    g_ms, g_per = ALGOS["GCCS-2Phase"](segments, edges, cluster)
+    rows.append({"algorithm":"GCCS-2Phase","makespan":float(g_ms)})
+    (out/"GCCS-2Phase.json").write_text(json.dumps(g_per, indent=2, ensure_ascii=False))
+    print(f"[GCCS-2Phase] makespan={g_ms:.6f}")
+
+    # HEFT（带通信开销，comm_scale 可视化调节 1.4~2.0）
+    h_ms, h_per = ALGOS["HEFT"](segments, edges, cluster, comm_scale=1.6)
+    rows.append({"algorithm":"HEFT","makespan":float(h_ms)})
+    (out/"HEFT.json").write_text(json.dumps(h_per, indent=2, ensure_ascii=False))
+    print(f"[HEFT] makespan={h_ms:.6f}")
+
+    for name in ["HydraLike","MRSALike"]:
+        ms, per = ALGOS[name](segments, edges, cluster)
+        rows.append({"algorithm":name,"makespan":float(ms)})
+        (out/f"{name}.json").write_text(json.dumps(per, indent=2, ensure_ascii=False))
         print(f"[{name}] makespan={ms:.6f}")
-    pd.DataFrame(rows).to_csv(out_dir / "summary.csv", index=False)
-    print(f"Wrote results to {out_dir}")
+
+    pd.DataFrame(rows).to_csv(out/"summary.csv", index=False)
+    print(f"Wrote results to {out}")
 
 if __name__ == "__main__":
     main()
