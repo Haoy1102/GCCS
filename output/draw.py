@@ -12,7 +12,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 from pathlib import Path
 
-DATA_DIR = Path("./data")
+DATA_DIR = Path("data_gen")
 CSV_E1_EQUAL = DATA_DIR / "e1_equal.csv"
 CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
 CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"

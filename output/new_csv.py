@@ -88,14 +88,14 @@ e4_df = pd.DataFrame([
 ])
 
 # Save CSVs
-e1_equal_df.to_csv("./data/e1_equal.csv", index=False)
-e1_unequal_df.to_csv("./data/e1_unequal.csv", index=False)
-e2_df.to_csv("./data/e2_heterogeneity.csv", index=False)
-e3_df.to_csv("./data/e3_balanced_longtail.csv", index=False)
-e4_df.to_csv("./data/e4_ablation.csv", index=False)
+e1_equal_df.to_csv("./data_gen/e1_equal.csv", index=False)
+e1_unequal_df.to_csv("./data_gen/e1_unequal.csv", index=False)
+e2_df.to_csv("./data_gen/e2_heterogeneity.csv", index=False)
+e3_df.to_csv("./data_gen/e3_balanced_longtail.csv", index=False)
+e4_df.to_csv("./data_gen/e4_ablation.csv", index=False)
 
 # Also bundle into an Excel workbook
-# with pd.ExcelWriter("/mnt/data/sim_results.xlsx", engine="xlsxwriter") as writer:
+# with pd.ExcelWriter("/mnt/data_gen/sim_results.xlsx", engine="xlsxwriter") as writer:
 #     e1_equal_df.to_excel(writer, sheet_name="E1_equal", index=False)
 #     e1_unequal_df.to_excel(writer, sheet_name="E1_unequal", index=False)
 #     e2_df.to_excel(writer, sheet_name="E2_heterogeneity", index=False)
