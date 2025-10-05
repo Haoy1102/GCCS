@@ -1,49 +1,38 @@
-
+# main.py
 from __future__ import annotations
-import json
 from pathlib import Path
 import pandas as pd
 import common
-from algo import two_phase as algo_two_phase
-from algo import heft as algo_heft
-from algo import hydra_like as algo_hydra
-from algo import mrsa_like as algo_mrsa
+from experiments import run_all_once_yield
 
-ALGOS = {
-    "GCCS-2Phase": algo_two_phase.run,
-    "HEFT":        algo_heft.run,
-    "HydraLike":   algo_hydra.run,
-    "MRSALike":    algo_mrsa.run,
-}
+# pho/rho 默认 1R
+RHO   = "1R"   # 可用 '0.5R' / '2R' / '4R' / 数值
+KAPPA = 4
+SEED  = 2025
+
+HEFT_EXTRA_COMM_S = 0.04
+ENABLE_CROSS_COMM = True
+ENABLE_INTRA_COMM = True
 
 def main():
-    segments, edges = common.load_segments_edges()
-    # rho 自适应于本批 workload；kappa=4 作为常用值
-    cluster = common.make_default_cluster(num_servers=6, rho='auto', kappa=4, segments=segments, seed=2025)
+    seg, edg = common.load_segments_edges()
+
+    rows = []
+    for row in run_all_once_yield(
+        seg, edg,
+        rho=RHO, kappa=int(KAPPA),
+        seed=SEED,
+        heft_extra_comm_s=HEFT_EXTRA_COMM_S,
+        enable_cross_comm=ENABLE_CROSS_COMM,
+        enable_intra_comm=ENABLE_INTRA_COMM
+    ):
+        # 每个算法结束就打印；rho 显示为 'xR'
+        print(f"rho={row['rho']}, kappa={row['kappa']}, {row['method']}={row['makespan']:.3f}")
+        rows.append(row)
 
     out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
-    rows=[]
-
-    # GCCS
-    g_ms, g_per = ALGOS["GCCS-2Phase"](segments, edges, cluster)
-    rows.append({"algorithm":"GCCS-2Phase","makespan":float(g_ms)})
-    (out/"GCCS-2Phase.json").write_text(json.dumps(g_per, indent=2, ensure_ascii=False))
-    print(f"[GCCS-2Phase] makespan={g_ms:.6f}")
-
-    # HEFT（带通信开销，comm_scale 可视化调节 1.4~2.0）
-    h_ms, h_per = ALGOS["HEFT"](segments, edges, cluster, comm_scale=1.6)
-    rows.append({"algorithm":"HEFT","makespan":float(h_ms)})
-    (out/"HEFT.json").write_text(json.dumps(h_per, indent=2, ensure_ascii=False))
-    print(f"[HEFT] makespan={h_ms:.6f}")
-
-    for name in ["HydraLike","MRSALike"]:
-        ms, per = ALGOS[name](segments, edges, cluster)
-        rows.append({"algorithm":name,"makespan":float(ms)})
-        (out/f"{name}.json").write_text(json.dumps(per, indent=2, ensure_ascii=False))
-        print(f"[{name}] makespan={ms:.6f}")
-
-    pd.DataFrame(rows).to_csv(out/"summary.csv", index=False)
-    print(f"Wrote results to {out}")
+    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"sweep.csv", index=False)
+    print(f"Saved -> {out/'sweep.csv'}")
 
 if __name__ == "__main__":
     main()
