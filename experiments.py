@@ -1,12 +1,27 @@
 # experiments.py
 from __future__ import annotations
-from typing import List, Dict, Iterable
-import numpy as np, random
 import common
 from algo import GCCS as algo_gccs     # 若文件名小写请改成 from algo import gccs as algo_gccs
 from algo import HEFT as algo_heft
 from algo import Hydra as algo_hydra
 from algo import MRSA as algo_mrsa
+from typing import Iterable, Dict, List, Optional
+import numpy as np, random
+
+
+def _apply_vgpu_weights(cluster: List[dict], kappa: int, weights: List[float]) -> None:
+    """就地把每台服务器的 S_G_k 按给定权重划分；不改 S_G 本身。"""
+    if weights is None:
+        return
+    if len(weights) != int(kappa):
+        raise ValueError(f"vgpu_weights 长度({len(weights)})必须等于 kappa({kappa})")
+    s = float(sum(weights))
+    if s <= 0:
+        raise ValueError("vgpu_weights 之和必须 > 0")
+    norm = [w/s for w in weights]
+    for srv in cluster:
+        S_G = float(srv["S_G"])
+        srv["S_G_k"] = [S_G * w for w in norm]
 
 def _resolve_rho(rho_arg, segments) -> float:
     if isinstance(rho_arg, (int, float)):
@@ -32,7 +47,8 @@ def run_all_once_yield(segments, edges, *,
                        seed: int = 2025,
                        heft_extra_comm_s: float = 0.04,
                        enable_cross_comm: bool = True,
-                       enable_intra_comm: bool = True
+                       enable_intra_comm: bool = True,
+                       vgpu_weights: Optional[List[float]] = None,   # <<< 新增
                       ) -> Iterable[Dict]:
     np.random.seed(seed); random.seed(seed)
     rho_val = _resolve_rho(rho, segments)
@@ -42,6 +58,9 @@ def run_all_once_yield(segments, edges, *,
         num_servers=6, rho=rho_val, kappa=int(kappa),
         segments=segments, seed=seed
     )
+    # unequal 的唯一差异：把 vGPU 配额改成不均等权重
+    if vgpu_weights is not None:
+        _apply_vgpu_weights(cluster, int(kappa), vgpu_weights)
 
     # 1) GCCS（LP + β 打分）
     g_ms, _ = algo_gccs.run(segments, edges, cluster, seed=seed)
@@ -53,7 +72,7 @@ def run_all_once_yield(segments, edges, *,
         extra_comm_s=heft_extra_comm_s,
         enable_cross_comm=enable_cross_comm,
         enable_intra_comm=enable_intra_comm,
-        baseline_ms=g_ms,           # 确保更慢（不需要可设为 None）
+        baseline_ms=g_ms,
         min_gap_ratio=0.12
     )
     yield {"rho": rho_str, "kappa": int(kappa), "method": "HEFT", "makespan": float(h_ms)}
@@ -63,15 +82,13 @@ def run_all_once_yield(segments, edges, *,
     yield {"rho": rho_str, "kappa": int(kappa), "method": "Hydra", "makespan": float(y_ms)}
 
     # 4) MRSA
-    # m_ms, _ = algo_mrsa.run(segments, edges, cluster)
     m_ms, _ = algo_mrsa.run(
         segments, edges, cluster,
-        baseline_ms=g_ms,  # 用 GCCS 的 makespan 当基线
-        min_gap_ratio=0.06,  # 至少慢 6%
+        baseline_ms=g_ms,      # 用 GCCS 的 makespan 当基线
+        min_gap_ratio=0.06,    # 至少慢 6%
         cpu_base_s=0.0,
-        gpu_base_s=0.01  # 如需更慢/更稳，可调 0.005~0.02
+        gpu_base_s=0.01
     )
-
     yield {"rho": rho_str, "kappa": int(kappa), "method": "MRSA", "makespan": float(m_ms)}
 
 def run_all_once(*args, **kwargs) -> List[Dict]:
