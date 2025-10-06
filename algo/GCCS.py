@@ -2,13 +2,15 @@
 # GCCS (your two-phase algorithm)
 # Phase-1: LP (PuLP) min-max assignment + capacity-aware randomized rounding (robust normalization)
 # Phase-2: per-server scheduling using common.schedule_on_server
+# --------- 本版新增：候选分数 Πcpu/Πgpu（含 β 参数），由 priority_fn 实现 ---------
 
 from __future__ import annotations
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Callable
 import numpy as np
 import pandas as pd
 from common import schedule_on_server
 
+# ---------- Phase-1: LP (PuLP) ----------
 def phase1_lp(
     segments: pd.DataFrame,
     cluster: List[Dict],
@@ -46,6 +48,7 @@ def phase1_lp(
         raise RuntimeError("PuLP 求解失败: z=None")
     z_cap = float(z_star) * float(slack)
 
+    # 容量感知随机舍入（健壮的概率归一化）
     xhat = {
         i: np.clip(np.array([float(pulp.value(x[(i,n)]) or 0.0) for n in range(N)], dtype=float), 0.0, 1.0)
         for i in tasks
@@ -82,6 +85,7 @@ def phase1_lp(
             mask[n] = False
 
         if assigned is None:
+            # 最小违约修复
             best_name, best_metric = None, float('inf')
             for srv in cluster:
                 nm = srv['name']
@@ -97,22 +101,65 @@ def phase1_lp(
 
     return state, z_cap
 
+
+# ---------- Phase-2: priority(含 β) + per-server 调度 ----------
+def make_priority_fn(beta_cpu: float = 0.2,
+                     beta_gpu: float = 0.2,
+                     use_time: bool = True) -> Callable:
+    """
+    返回 priority_fn(tid, v, ctx)：
+      Π_cpu(i,s) = Crit(i,s) - β * C_{i,s}
+      Π_gpu(i,s) = Crit(i,s) + β' * G_{i,s}
+    其中 C_{i,s}, G_{i,s} 默认用 “时间惩罚”（C/S_C 与 G/avg(S_Gk)），更稳定；
+    若 use_time=False 则用原始 TFLOP（C 与 G）。
+    """
+    def prio(tid, v, ctx):
+        srv  = ctx['server']
+        segs = ctx['segments']
+        crit = ctx['task_struct'][tid]['crit'][v]
+        row  = segs[(segs['task_id']==tid) & (segs['seg_id']==v)].iloc[0]
+        typ  = str(row['type']).upper()
+
+        if use_time:
+            if typ == 'CPU':
+                C_is = float(row['C_TFLOP']) / float(srv['S_C'])
+                return crit - beta_cpu * C_is
+            else:
+                G_is = float(row['G_TFLOP']) / float(np.mean(srv['S_G_k']))
+                return crit + beta_gpu * G_is
+        else:
+            if typ == 'CPU':
+                return crit - beta_cpu * float(row['C_TFLOP'])
+            else:
+                return crit + beta_gpu * float(row['G_TFLOP'])
+    return prio
+
+
 def run(
     segments: pd.DataFrame,
     edges: pd.DataFrame,
     cluster: List[Dict],
     seed: int = 2025,
-    slack: float = 1.08
+    slack: float = 1.08,
+    beta_cpu: float = 0.2,
+    beta_gpu: float = 0.2,
+    prio_use_time: bool = True
 ) -> Tuple[float, Dict[str, float]]:
-    server_state, z = phase1_lp(segments, cluster, seed=seed, slack=slack)
-
-    def prio(tid, v, ctx):
-        # use critical-path based priority computed in schedule_on_server
-        return ctx['task_struct'][tid]['crit'][v]
+    """
+    Phase-1：LP 指派；Phase-2：在每台服务器上用 Π 分数排序（含 β），
+    CPU 串行、GPU 按 EFT 选 vGPU 队列（schedule_on_server 已实现）。
+    """
+    server_state, _ = phase1_lp(segments, cluster, seed=seed, slack=slack)
 
     per = {}
     for s in cluster:
-        ms, _ = schedule_on_server(s['name'], segments, edges, cluster, server_state[s['name']]['tasks'], prio)
+        prio = make_priority_fn(beta_cpu=beta_cpu, beta_gpu=beta_gpu, use_time=prio_use_time)
+        ms, _ = schedule_on_server(
+            s['name'], segments, edges, cluster,
+            server_state[s['name']]['tasks'],
+            priority_fn=prio
+        )
         per[s['name']] = ms
+
     overall = max(per.values()) if per else 0.0
     return float(overall), per
