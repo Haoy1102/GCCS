@@ -48,7 +48,11 @@ def run_all_once_yield(segments, edges, *,
                        heft_extra_comm_s: float = 0.04,
                        enable_cross_comm: bool = True,
                        enable_intra_comm: bool = True,
-                       vgpu_weights: Optional[List[float]] = None,   # <<< 新增
+                       vgpu_weights: Optional[List[float]] = None,
+                       # ===== 新增：为 long-tail 指定“用哪个分片来算 rho/构建集群” =====
+                       segments_for_rho = None,
+                       cluster_segments = None,
+                       cluster_factory_kwargs: Optional[dict] = None,
                       ) -> Iterable[Dict]:
     np.random.seed(seed); random.seed(seed)
     rho_val = _resolve_rho(rho, segments)

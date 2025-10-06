@@ -91,7 +91,7 @@ e4_df = pd.DataFrame([
 e1_equal_df.to_csv("./data_gen/e1_equal.csv", index=False)
 e1_unequal_df.to_csv("./data_gen/e1_unequal.csv", index=False)
 e2_df.to_csv("./data_gen/e2_heterogeneity.csv", index=False)
-e3_df.to_csv("./data_gen/e3_balanced_longtail.csv", index=False)
+e3_df.to_csv("./data_gen/e3_longtail.csv", index=False)
 e4_df.to_csv("./data_gen/e4_ablation.csv", index=False)
 
 # Also bundle into an Excel workbook

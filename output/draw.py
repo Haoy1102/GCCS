@@ -20,14 +20,15 @@ E1_STYLE = "bar"   # 想用折线就改成 "line"
 
 from pathlib import Path
 
-DATA_DIR = Path("data_gen")
 # CSV_E1_EQUAL = DATA_DIR / "e1_equal.csv"
-CSV_E1_EQUAL = "./data/e1_equal.csv"
-CSV_E1_UNEQUAL = "./data/e1_unequal.csv"
 # CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
 # CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
+# CSV_E3 = DATA_DIR / "e3_longtail.csv"
+DATA_DIR = Path("data_gen")
+CSV_E1_EQUAL = "./data/e1_equal.csv"
+CSV_E1_UNEQUAL = "./data/e1_unequal.csv"
 CSV_E2 = "./data/e2_heterogeneity.csv"
-CSV_E3 = DATA_DIR / "e3_balanced_longtail.csv"
+CSV_E3 = "./data/e3_longtail.csv"
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
 # 方法重命名
