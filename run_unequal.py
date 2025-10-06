@@ -56,9 +56,12 @@ def main():
                 rows.append(row)
 
     # 统一写盘（四列）
-    pd.DataFrame(rows, columns=["rho", "kappa", "method", "makespan"]) \
-      .to_csv(OUT_CSV, mode="a", header=False, index=False)
-    print(f"[saved] {OUT_CSV.resolve()}")
+    # pd.DataFrame(rows, columns=["rho", "kappa", "method", "makespan"]) \
+    #   .to_csv(OUT_CSV, mode="a", header=False, index=False)
+    # print(f"[saved] {OUT_CSV.resolve()}")
+    out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"e1_unequal.csv", index=False)
+    print(f"Saved -> {out/'e1_unequal.csv'}")
 
 
 if __name__ == "__main__":

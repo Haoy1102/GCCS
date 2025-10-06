@@ -25,7 +25,8 @@ DATA_DIR = Path("data_gen")
 CSV_E1_EQUAL = "./data/e1_equal.csv"
 CSV_E1_UNEQUAL = "./data/e1_unequal.csv"
 # CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
-CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
+# CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
+CSV_E2 = "./data/e2_heterogeneity.csv"
 CSV_E3 = DATA_DIR / "e3_balanced_longtail.csv"
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
@@ -51,6 +52,8 @@ BAR_EDGE_WIDTH = 0.6
 GROUP_TOTAL_WIDTH = 0.78   # 每组总体宽度（<1 会让组之间也留些空隙）
 # ==============================================
 
+def _bar_grid(ax):
+    ax.grid(True, axis="y", linestyle=":", linewidth=0.8, alpha=0.7)
 
 def _csv_exists():
     return all(Path(p).exists() for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E2, CSV_E3, CSV_E4])
@@ -94,6 +97,7 @@ def grouped_bar(ax, x_labels, series_dict, title, xlabel, ylabel):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    _bar_grid(ax)
     ax.legend(frameon=False)
 
 def plot_e1_for_rho(df, rho, tag):
@@ -151,27 +155,42 @@ def plot_e1_for_rho(df, rho, tag):
     plt.close(fig)
 
 
-def plot_e2(field, title, filename, df):
-    fig, ax = plt.subplots(figsize=(7.6,4.4))
-    for m in _ordered_methods(df["method"].unique()):
-        d = df[df["method"]==m].sort_values("H")
+def plot_e2(title: str, filename: str, df: pd.DataFrame):
+    """E2：按异构度 H 画 makespan 折线（数据列：H, method, makespan）"""
+    fig, ax = plt.subplots(figsize=(7.6, 4.4))
+
+    methods = _ordered_methods(df["method"].unique())
+    for m in methods:
+        d = df[df["method"] == m].sort_values("H")
         ax.plot(
-            d["H"].values, d[field].values,
+            d["H"].values,
+            d["makespan"].values,
             marker="o",
             label=m,
             color=COLORS.get(m, None),
             linewidth=2,
             alpha=(LINE_ALPHA if USE_ALPHA else 1.0),
-            markeredgecolor="white", markeredgewidth=0.6  # 折线的点也有细白边，风格统一
+            markeredgecolor="white",
+            markeredgewidth=0.8,
         )
-    ax.set_title(title)
+
+    ax.set_title(title or "E2: makespan vs heterogeneity H")
     ax.set_xlabel("H (CV of vGPU capacity split)")
-    ax.set_ylabel(field.replace("_"," ").title())
-    ax.legend(frameon=False)
+    ax.set_ylabel("Makespan")
+
+    # 网格线（在柱/线下方）
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="y", linestyle=":", linewidth=0.8, alpha=0.7)
+
+    # 图例带框
+    leg = ax.legend(frameon=True)
+    leg.get_frame().set_linewidth(0.8)
+
     out = OUT_DIR / filename
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     plt.close(fig)
+
 
 def plot_e3(metric, title_suffix, filename, df):
     fig, ax = plt.subplots(figsize=(7.6,4.4))
@@ -197,6 +216,7 @@ def plot_e3(metric, title_suffix, filename, df):
     ax.set_xlabel("Dataset")
     ax.set_ylabel(metric.upper())
     ax.legend(frameon=False)
+    _bar_grid(ax)
     out = OUT_DIR / filename
     fig.tight_layout()
     fig.savefig(out, dpi=200)
@@ -219,6 +239,7 @@ def plot_e4(metric, title_suffix, filename, df):
     ax.set_title(f"E4: {title_suffix}")
     ax.set_xlabel("Variant")
     ax.set_ylabel(metric.upper())
+    _bar_grid(ax)
     out = OUT_DIR / filename
     fig.tight_layout()
     fig.savefig(out, dpi=200)
@@ -232,8 +253,8 @@ def main():
     for rho in sorted(e1_unequal["rho"].unique()):
         plot_e1_for_rho(e1_unequal, rho, "unequal")
 
-    if {"H","method","makespan_multiplier"}.issubset(e2.columns):
-        plot_e2("makespan_multiplier", "E2: makespan multiplier vs heterogeneity H", "fig_E2_makespan_multiplier.png", e2)
+    if {"H", "method", "makespan"}.issubset(e2.columns):
+        plot_e2("E2: makespan vs heterogeneity H", "fig_E2_makespan.png", e2)
     # if {"H","method","p99_multiplier"}.issubset(e2.columns):
     #     plot_e2("p99_multiplier", "E2: P99 multiplier vs heterogeneity H", "fig_E2_p99_multiplier.png", e2)
 
