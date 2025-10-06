@@ -9,12 +9,20 @@ import matplotlib.pyplot as plt
 # ================== settings ==================
 OUT_DIR = Path("./figs")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+# —— 基准线配置（不做归一化）——
+# 基准线两种模式： "method" 用某个方法的曲线作为参考；"constant" 用常数水平线
+BASELINE_MODE     = "method"        # "method" 或 "constant"
+BASELINE_METHOD   = "GCCS"          # 当 BASELINE_MODE="method" 时，参考的方法名
+BASELINE_CONST_Y  = 300.0           # 当 BASELINE_MODE="constant" 时，水平线的 y 值（示例）
+# === E1 图样式开关： "bar" 或 "line" ===
+E1_STYLE = "bar"   # 想用折线就改成 "line"
+
 
 from pathlib import Path
 
 DATA_DIR = Path("data_gen")
 # CSV_E1_EQUAL = DATA_DIR / "e1_equal.csv"
-CSV_E1_EQUAL = "./data_bk/base_ex.csv"
+CSV_E1_EQUAL = "./data/result.csv"
 CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
 CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
 CSV_E3 = DATA_DIR / "e3_balanced_longtail.csv"
@@ -88,26 +96,59 @@ def grouped_bar(ax, x_labels, series_dict, title, xlabel, ylabel):
     ax.legend(frameon=False)
 
 def plot_e1_for_rho(df, rho, tag):
-    df_r = df[df["rho"]==rho]
+    df_r = df[df["rho"] == rho].copy()
     kappas = sorted(df_r["kappa"].unique())
     methods = _ordered_methods(sorted(df_r["method"].unique()))
-    series = {
-        m: [df_r[(df_r["method"]==m) & (df_r["kappa"]==k)]["makespan"].values[0] for k in kappas]
-        for m in methods
-    }
-    fig, ax = plt.subplots(figsize=(7.6,4.4))
-    grouped_bar(
-        ax,
-        [str(k) for k in kappas],
-        series,
-        title=f"E1-{tag}: makespan vs kappa (rho={rho})",
-        xlabel="kappa (vGPU count per server)",
-        ylabel="Normalized makespan",
-    )
+
+    if E1_STYLE == "line":
+        # —— 折线图 ——（点白边、y 轴虚线网格、图例带框）
+        fig, ax = plt.subplots(figsize=(7.6, 4.4))
+        for m in methods:
+            d = df_r[df_r["method"] == m].sort_values("kappa")
+            ax.plot(
+                d["kappa"].values,
+                d["makespan"].values,
+                marker="o",
+                label=m,
+                color=COLORS.get(m, None),
+                linewidth=2,
+                alpha=(LINE_ALPHA if USE_ALPHA else 1.0),
+                markeredgecolor="white",
+                markeredgewidth=0.8,
+            )
+        ax.set_xticks(kappas)
+        ax.grid(True, axis="y", linestyle=":", linewidth=0.8, alpha=0.7)
+
+    else:
+        # —— 柱状图 ——（留白缝、白描边，与你当前 grouped_bar 风格一致）
+        series = {
+            m: [df_r[(df_r["method"] == m) & (df_r["kappa"] == k)]["makespan"].values[0]
+                for k in kappas]
+            for m in methods
+        }
+        fig, ax = plt.subplots(figsize=(7.6, 4.4))
+        grouped_bar(
+            ax,
+            [str(k) for k in kappas],
+            series,
+            title="",  # 标题下面统一设置
+            xlabel="",
+            ylabel="",
+        )
+
+    ax.set_title(f"E1-{tag}: makespan vs kappa (rho={rho})")
+    ax.set_xlabel("kappa (vGPU count per server)")
+    ax.set_ylabel("Makespan")
+
+    # 图例带框
+    leg = ax.legend(frameon=True)
+    leg.get_frame().set_linewidth(0.8)
+
     out = OUT_DIR / f"fig_E1_{tag}_rho{str(rho).replace('.','_')}.png"
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     plt.close(fig)
+
 
 def plot_e2(field, title, filename, df):
     fig, ax = plt.subplots(figsize=(7.6,4.4))

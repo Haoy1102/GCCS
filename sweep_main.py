@@ -10,7 +10,7 @@ def main():
     R = common.workload_ratio_R(seg)
 
     rho_list = ["0.5R", "1R", "2R", "4R"]  # 也可换成具体数字或混用
-    kappas   = [2, 3, 4, 5, 6]
+    kappas   = [1, 2, 4, 8]
     SEED     = 2025
 
     HEFT_EXTRA_COMM_S = 0.04
@@ -33,8 +33,8 @@ def main():
                 rows.append(row)
 
     out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"base_ex.csv", index=False)
-    print(f"Saved -> {out/'base_ex.csv'}")
+    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"result.csv", index=False)
+    print(f"Saved -> {out/'result.csv'}")
 
 if __name__ == "__main__":
     main()
