@@ -31,8 +31,8 @@ def main():
         rows.append(row)
 
     # out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
-    # pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"sweep.csv", index=False)
-    # print(f"Saved -> {out/'sweep.csv'}")
+    # pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"base_ex.csv", index=False)
+    # print(f"Saved -> {out/'base_ex.csv'}")
 
 if __name__ == "__main__":
     main()
