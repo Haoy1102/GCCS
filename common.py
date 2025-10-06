@@ -9,7 +9,7 @@ import numpy as np
 
 # ---------- IO ----------
 def load_segments_edges(segments_csv: str|None=None, edges_csv: str|None=None):
-    if segments_csv is None: segments_csv = "./input/segments.csv"
+    if segments_csv is None: segments_csv = "./input/segments_base.csv"
     if edges_csv is None: edges_csv = "./input/edges.csv"
     seg = pd.read_csv(segments_csv)
     edg = pd.read_csv(edges_csv)

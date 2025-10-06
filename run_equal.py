@@ -1,4 +1,4 @@
-# sweep_main.py
+# run_equal.py
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd
@@ -33,8 +33,8 @@ def main():
                 rows.append(row)
 
     out = Path("./output/data"); out.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"result.csv", index=False)
-    print(f"Saved -> {out/'result.csv'}")
+    pd.DataFrame(rows)[["rho","kappa","method","makespan"]].to_csv(out/"e1_equal.csv", index=False)
+    print(f"Saved -> {out/'e1_equal.csv'}")
 
 if __name__ == "__main__":
     main()
