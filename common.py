@@ -103,7 +103,7 @@ def compute_crit_for_task(task_id: str, segments: pd.DataFrame, edges: pd.DataFr
 # ---------- per-server scheduler (CPU-serial + GPU-EFT) ----------
 def schedule_on_server(server_name: str, segments: pd.DataFrame, edges: pd.DataFrame,
                        cluster: List[Dict], assigned_tasks: List[str],
-                       priority_fn: Callable):
+                       priority_fn: Callable, gpu_queue_mode: str = "dynamic"):
     srv = next(s for s in cluster if s['name']==server_name)
     S_C = srv['S_C']; S_G_k = srv['S_G_k']; S_G_sum = sum(S_G_k)
     T_cpu = 0.0; T_k = [0.0 for _ in S_G_k]; finish = {}
@@ -119,6 +119,7 @@ def schedule_on_server(server_name: str, segments: pd.DataFrame, edges: pd.DataF
             if cnt==0:
                 typ = segments[(segments['task_id']==tid)&(segments['seg_id']==v)].iloc[0]['type']
                 ready.append((tid,v,typ))
+    fixed_lane_for_task = {}
     while ready:
         ready.sort(key=lambda x: priority_fn(x[0], x[1], {'server':srv,'task_struct':task_struct,'segments':segments}), reverse=True)
         tid,v,typ = ready.pop(0)
@@ -128,11 +129,23 @@ def schedule_on_server(server_name: str, segments: pd.DataFrame, edges: pd.DataF
         else:
             preds = task_struct[tid]['pred'][v]
             rls = max([0.0]+[finish[(tid,u)] for u in preds]) if preds else 0.0
-            best_k, best_end = None, float('inf')
-            for k,cap in enumerate(S_G_k):
-                st = max(T_k[k], rls); ft = st + row['G_TFLOP']/cap
-                if ft < best_end: best_end, best_k = ft, k
-            T_k[best_k] = best_end; end = best_end
+            if gpu_queue_mode == "fixed" and tid in fixed_lane_for_task:
+                k = fixed_lane_for_task[tid]
+                start_k = max(T_k[k], rls)
+                end = start_k + row['G_TFLOP'] / S_G_k[k]
+                T_k[k] = end
+            else:
+                # 动态（或第一次）：按 EFT 选
+                best_k, best_end = None, float('inf')
+                for k, cap in enumerate(S_G_k):
+                    st = max(T_k[k], rls);
+                    ft = st + row['G_TFLOP'] / cap
+                    if ft < best_end: best_end, best_k = ft, k
+                # 更新 & 如需固定，记下来
+                T_k[best_k] = best_end;
+                end = best_end
+                if gpu_queue_mode == "fixed" and tid not in fixed_lane_for_task:
+                    fixed_lane_for_task[tid] = best_k
         finish[(tid,v)] = end
         for u in task_struct[tid]['succ'][v]:
             task_struct[tid]['indeg'][u]-=1

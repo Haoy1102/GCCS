@@ -101,6 +101,33 @@ def phase1_lp(
 
     return state, z_cap
 
+def phase1_random(segments, cluster, seed=2025):
+    """去掉 min-max 打包：完全随机把每个任务指派到一台服务器（不看任何负载）。"""
+    import numpy as np
+    rng = np.random.RandomState(seed)
+    totals = (segments.groupby('task_id')
+              .agg(total_C=('C_TFLOP','sum'), total_G=('G_TFLOP','sum'))
+              .reset_index())
+    state = {s['name']: {'cpu_load':0.0,'gpu_load':0.0,'tasks':[]} for s in cluster}
+    for r in totals.itertuples():
+        srv = cluster[int(rng.randint(0, len(cluster)))]
+        state[srv['name']]['tasks'].append(r.task_id)
+    return state, 0.0
+
+def phase1_global_greedy(segments, cluster):
+    """去掉 min-max 打包：逐任务独立选 argmin_s max(C/S_C[s], G/S_G[s])，忽略当前负载。"""
+    totals = (segments.groupby('task_id')
+              .agg(total_C=('C_TFLOP','sum'), total_G=('G_TFLOP','sum'))
+              .reset_index())
+    state = {s['name']: {'cpu_load':0.0,'gpu_load':0.0,'tasks':[]} for s in cluster}
+    for r in totals.itertuples():
+        best = None; best_cost = float('inf')
+        for srv in cluster:
+            cost = max(r.total_C/srv['S_C'], r.total_G/srv['S_G'])
+            if cost < best_cost:
+                best_cost = cost; best = srv['name']
+        state[best]['tasks'].append(r.task_id)
+    return state, 0.0
 
 # ---------- Phase-2: priority(含 β) + per-server 调度 ----------
 def make_priority_fn(beta_cpu: float = 0.2,
@@ -143,13 +170,24 @@ def run(
     slack: float = 1.08,
     beta_cpu: float = 1.2,
     beta_gpu: float = 0.5,
+    phase1_mode: str = "lp",  # 新增：'lp' | 'random' | 'global'
+    gpu_queue_mode: str = "dynamic",  # 新增：'dynamic' | 'fixed'
     prio_use_time: bool = True
 ) -> Tuple[float, Dict[str, float]]:
     """
     Phase-1：LP 指派；Phase-2：在每台服务器上用 Π 分数排序（含 β），
     CPU 串行、GPU 按 EFT 选 vGPU 队列（schedule_on_server 已实现）。
     """
-    server_state, _ = phase1_lp(segments, cluster, seed=seed, slack=slack)
+    # server_state, _ = phase1_lp(segments, cluster, seed=seed, slack=slack)
+    if phase1_mode == "lp":
+        server_state, z = phase1_lp(segments, cluster, seed=seed, slack=slack)
+    elif phase1_mode == "random":
+        server_state, z = phase1_random(segments, cluster, seed=seed)
+    elif phase1_mode == "global":
+        server_state, z = phase1_global_greedy(segments, cluster)
+    else:
+        raise ValueError(f"Unknown phase1_mode = {phase1_mode}")
+
 
     per = {}
     for s in cluster:
@@ -157,7 +195,8 @@ def run(
         ms, _ = schedule_on_server(
             s['name'], segments, edges, cluster,
             server_state[s['name']]['tasks'],
-            priority_fn=prio
+            priority_fn=prio,
+            gpu_queue_mode = gpu_queue_mode
         )
         per[s['name']] = ms
 

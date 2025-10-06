@@ -24,12 +24,13 @@ from pathlib import Path
 # CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
 # CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
 # CSV_E3 = DATA_DIR / "e3_longtail.csv"
+# CSV_E4 = DATA_DIR / "e4_ablation.csv"
 DATA_DIR = Path("data_gen")
 CSV_E1_EQUAL = "./data/e1_equal.csv"
 CSV_E1_UNEQUAL = "./data/e1_unequal.csv"
 CSV_E2 = "./data/e2_heterogeneity.csv"
 CSV_E3 = "./data/e3_longtail.csv"
-CSV_E4 = DATA_DIR / "e4_ablation.csv"
+CSV_E4 =  "./data/e4_ablation.csv"
 
 # 方法重命名
 METHOD_ORDER = ["GCCS", "HEFT", "Hydra", "MRSA"]
@@ -51,7 +52,16 @@ LINE_ALPHA = 0.90
 BAR_EDGE_COLOR = "white"
 BAR_EDGE_WIDTH = 0.6
 GROUP_TOTAL_WIDTH = 0.78   # 每组总体宽度（<1 会让组之间也留些空隙）
+
+YLABEL_UNITS = {
+    "makespan": "s",   # 你也可以在这里给其它指标加单位，比如 "p99": "s"
+}
 # ==============================================
+def _ylabel(metric: str) -> str:
+    """把字段名变成人话 + 单位"""
+    pretty = metric.replace("_", " ").title()      # "makespan" -> "Makespan"
+    unit = YLABEL_UNITS.get(metric.lower())
+    return f"{pretty} ({unit})" if unit else pretty
 
 def _bar_grid(ax):
     ax.grid(True, axis="y", linestyle=":", linewidth=0.8, alpha=0.7)
@@ -144,7 +154,7 @@ def plot_e1_for_rho(df, rho, tag):
 
     ax.set_title(f"E1-{tag}: makespan vs kappa (rho={rho})")
     ax.set_xlabel("kappa (vGPU count per server)")
-    ax.set_ylabel("Makespan")
+    ax.set_ylabel(_ylabel("makespan"))
 
     # 图例带框
     leg = ax.legend(frameon=True)
@@ -177,7 +187,7 @@ def plot_e2(title: str, filename: str, df: pd.DataFrame):
 
     ax.set_title(title or "E2: makespan vs heterogeneity H")
     ax.set_xlabel("H (CV of vGPU capacity split)")
-    ax.set_ylabel("Makespan")
+    ax.set_ylabel(_ylabel("makespan"))
 
     # 网格线（在柱/线下方）
     ax.set_axisbelow(True)
@@ -215,7 +225,7 @@ def plot_e3(metric, title_suffix, filename, df):
     ax.set_xticklabels(datasets)
     ax.set_title(f"E3: {title_suffix}")
     ax.set_xlabel("Dataset")
-    ax.set_ylabel(metric.upper())
+    ax.set_ylabel(_ylabel("makespan"))
     ax.legend(frameon=False)
     _bar_grid(ax)
     out = OUT_DIR / filename
@@ -229,17 +239,17 @@ def plot_e4(metric, title_suffix, filename, df):
     x = np.arange(len(x_labels))
     ax.bar(
         x, list(df[metric].values),
-        color="#BDBDBD",
+        # color="#BDBDBD",
         edgecolor=BAR_EDGE_COLOR,
         linewidth=BAR_EDGE_WIDTH,
         alpha=(BAR_ALPHA if USE_ALPHA else 1.0),
         width=0.72,
     )
     ax.set_xticks(x)
-    ax.set_xticklabels(x_labels, rotation=12, ha="right")
+    ax.set_xticklabels(x_labels)
     ax.set_title(f"E4: {title_suffix}")
-    ax.set_xlabel("Variant")
-    ax.set_ylabel(metric.upper())
+    ax.set_xlabel("Ablation Strategy")
+    ax.set_ylabel(_ylabel("makespan"))
     _bar_grid(ax)
     out = OUT_DIR / filename
     fig.tight_layout()
