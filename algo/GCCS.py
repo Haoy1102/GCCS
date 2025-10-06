@@ -141,8 +141,8 @@ def run(
     cluster: List[Dict],
     seed: int = 2025,
     slack: float = 1.08,
-    beta_cpu: float = 0.2,
-    beta_gpu: float = 0.2,
+    beta_cpu: float = 1.2,
+    beta_gpu: float = 0.5,
     prio_use_time: bool = True
 ) -> Tuple[float, Dict[str, float]]:
     """

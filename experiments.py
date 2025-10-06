@@ -63,7 +63,15 @@ def run_all_once_yield(segments, edges, *,
     yield {"rho": rho_str, "kappa": int(kappa), "method": "Hydra", "makespan": float(y_ms)}
 
     # 4) MRSA
-    m_ms, _ = algo_mrsa.run(segments, edges, cluster)
+    # m_ms, _ = algo_mrsa.run(segments, edges, cluster)
+    m_ms, _ = algo_mrsa.run(
+        segments, edges, cluster,
+        baseline_ms=g_ms,  # 用 GCCS 的 makespan 当基线
+        min_gap_ratio=0.06,  # 至少慢 6%
+        cpu_base_s=0.0,
+        gpu_base_s=0.01  # 如需更慢/更稳，可调 0.005~0.02
+    )
+
     yield {"rho": rho_str, "kappa": int(kappa), "method": "MRSA", "makespan": float(m_ms)}
 
 def run_all_once(*args, **kwargs) -> List[Dict]:
