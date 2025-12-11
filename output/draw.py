@@ -13,7 +13,8 @@ BASELINE_MODE = "method"  # "method" 或 "constant"
 BASELINE_METHOD = "GCCS"  # 当 BASELINE_MODE="method" 时，参考的方法名
 BASELINE_CONST_Y = 300.0  # 当 BASELINE_MODE="constant" 时，水平线的 y 值（示例）
 # === E1 图样式开关： "bar" 或 "line" ===
-E1_STYLE = "bar"  # 想用折线就改成 "line"
+# E1_STYLE = "bar"
+E1_STYLE = "line"
 
 from pathlib import Path
 
@@ -23,15 +24,17 @@ from pathlib import Path
 # CSV_E3 = DATA_DIR / "e3_longtail.csv"
 # CSV_E4 = DATA_DIR / "e4_ablation.csv"
 # DATA_DIR = Path("data")
-DATA_DIR = Path("./data_bk/v1_1")
+DATA_DIR = Path("./data_bk/v2")
 CSV_E1_EQUAL = DATA_DIR / "e1_equal.csv"
 CSV_E1_UNEQUAL = DATA_DIR / "e1_unequal.csv"
+CSV_E1_EQUAL_LONGTAIL = DATA_DIR / "e1_equal_longtail.csv"  # 新增长尾数据文件
+CSV_E1_UNEQUAL_LONGTAIL = DATA_DIR / "e1_unequal_longtail.csv"  # 新增长尾数据文件
 CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
 CSV_E3 = DATA_DIR / "e3_longtail.csv"
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
 # OUT_DIR = Path("./figs")
-OUT_DIR = Path("./data_bk/fig/v1_1")
+OUT_DIR = Path("./data_bk/fig/v2")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # 方法重命名
@@ -83,11 +86,13 @@ def load_data():
 
     e1_equal = pd.read_csv(CSV_E1_EQUAL)
     e1_unequal = pd.read_csv(CSV_E1_UNEQUAL)
+    e1_equal_longtail = pd.read_csv(CSV_E1_EQUAL_LONGTAIL)  # 加载长尾数据
+    e1_unequal_longtail = pd.read_csv(CSV_E1_UNEQUAL_LONGTAIL)  # 加载长尾数据
     e2 = pd.read_csv(CSV_E2)
     e3 = pd.read_csv(CSV_E3)
     e4 = pd.read_csv(CSV_E4)
 
-    return e1_equal, e1_unequal, e2, e3, e4
+    return e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail, e2, e3, e4
 
 
 def _ordered_methods(cands):
@@ -269,12 +274,17 @@ def plot_e4(metric, title_suffix, filename, df):
 
 
 def main():
-    e1_equal, e1_unequal, e2, e3, e4 = load_data()
+    e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail, e2, e3, e4 = load_data()
 
     for rho in sorted(e1_equal["rho"].unique()):
         plot_e1_for_rho(e1_equal, rho, "equal")
     for rho in sorted(e1_unequal["rho"].unique()):
         plot_e1_for_rho(e1_unequal, rho, "unequal")
+
+    for rho in sorted(e1_equal_longtail["rho"].unique()):
+        plot_e1_for_rho(e1_equal_longtail, rho, "equal_longtail")
+    for rho in sorted(e1_unequal_longtail["rho"].unique()):
+        plot_e1_for_rho(e1_unequal_longtail, rho, "unequal_longtail")
 
     if {"H", "method", "makespan"}.issubset(e2.columns):
         plot_e2("E2: makespan vs heterogeneity H", "fig_E2_makespan.png", e2)
