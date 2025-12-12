@@ -12,10 +12,10 @@ RHO   = "1R"
 KAPPA = 4
 SEED  = 2025
 
-SEG_PATH = "./input/segments_base.csv"
-EDG_PATH = "./input/edges.csv"
+SEG_PATH = "../../input/segments_base.csv"
+EDG_PATH = "../../input/edges.csv"
 
-OUT_DIR = Path("./output/data")
+OUT_DIR = Path("../../output/data")
 OUT_CSV = OUT_DIR / "e4_ablation.csv"
 
 # 四个变体（与题述 a/b/c/d 一一对应）

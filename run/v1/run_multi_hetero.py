@@ -7,15 +7,15 @@ import common
 from experiments import run_all_once_yield   # 复用统一入口（支持 vgpu_weights）
 
 # ===== 基础设置 =====
-SEG_PATH = "./input/segments_base.csv"
-EDG_PATH = "./input/edges.csv"
+SEG_PATH = "../../input/segments_base.csv"
+EDG_PATH = "../../input/edges.csv"
 
 RHO       = "1R"         # 只改变异构度；需要多 rho 可改为列表并外层再套一层循环
 KAPPA     = 4            # 题意固定 kappa=4
 SEED      = 2025
 H_LIST    = [0.00, 0.10, 0.20, 0.30, 0.40]   # 想多测就加
 
-OUT_DIR   = Path("./output/data")
+OUT_DIR   = Path("../../output/data")
 OUT_CSV   = OUT_DIR / "e2_heterogeneity.csv"
 
 

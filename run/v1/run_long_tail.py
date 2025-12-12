@@ -21,9 +21,9 @@ DATASETS = [
     ("Balanced", "./input/segments_base.csv"),
     ("LongTail", "./input/segments_heavy.csv"),
 ]
-EDG_PATH = "./input/edges.csv"
+EDG_PATH = "../../input/edges.csv"
 
-OUT_DIR = Path("./output/data")
+OUT_DIR = Path("../../output/data")
 OUT_CSV = OUT_DIR / "e3_longtail.csv"
 
 

@@ -1,4 +1,4 @@
-# run_equal.py
+# run_1_rho.py
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd
@@ -6,15 +6,15 @@ import common
 from experiments import run_all_once_yield
 
 SEED = 2025
-
 HEFT_EXTRA_COMM_S = 0.04
 ENABLE_CROSS_COMM = True
 ENABLE_INTRA_COMM = True
-
+RHO_CHOICES = ["0.5R", "0.7R","0.9R", "1.0R", "1.1R","1.3R","1.5R"]  # 也可换成具体数字或混用
+KAPPA_CHOICES = [1, 2, 4, 7]
 
 def main():
 
-    out = Path("./output/data");
+    out = Path("../../output/data");
     out.mkdir(parents=True, exist_ok=True)
 
     rows = []
@@ -32,12 +32,9 @@ def main():
 
 
 def process(edg, seg, rows):
-    R = common.workload_ratio_R(seg)
-    rho_list = ["0.5R", "1R", "2R", "4R"]  # 也可换成具体数字或混用
-    kappas = [1, 2, 3, 4, 5, 6]
 
-    for rho in rho_list:
-        for kappa in kappas:
+    for rho in RHO_CHOICES:
+        for kappa in KAPPA_CHOICES:
             for row in run_all_once_yield(
                     seg, edg,
                     rho=rho, kappa=int(kappa),

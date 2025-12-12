@@ -1,4 +1,4 @@
-# run_unequal.py
+# run_1_2_unequal.py
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -8,29 +8,30 @@ import common
 from experiments import run_all_once_yield  # 复用同一个入口，只多传 vgpu_weights
 
 # ------------- 实验网格（与 run_equal 风格一致） -------------
-RHO_CHOICES = ["0.5R", "1R", "2R", "4R"]
-KAPPA_CHOICES = [1, 2, 3, 4, 5, 6]
+RHO_CHOICES = ["0.5R", "0.7R","0.9R", "1.0R", "1.1R","1.3R","1.5R"]
+KAPPA_CHOICES = [1, 2, 4, 7]
 SEED = 2025
 
 # 为每个 κ 指定不均等 vGPU 权重（长度必须等于 κ；不要求和为 1，会在 common 内归一化）
 UNEQUAL_WEIGHTS = {
     1: [1.0],
     2: [0.3, 0.7],
-    3: [0.2,0.3,0.5],
+    # 3: [0.2,0.3,0.5],
     4: [0.1, 0.2, 0.3, 0.4],
-    5: [0.1, 0.1, 0.2, 0.2, 0.4],
-    6: [0.1, 0.1, 0.1, 0.2, 0.2, 0.3],
+    # 5: [0.1, 0.1, 0.2, 0.2, 0.4],
+    # 6: [0.1, 0.1, 0.1, 0.2, 0.2, 0.3],
+    7: [0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3],
     # 8: [0.03, 0.07, 0.10, 0.10, 0.10, 0.10, 0.20, 0.30],
 }
 
 # 输出
-OUT_DIR = Path("./output/data")
+OUT_DIR = Path("../../output/data")
 OUT_CSV = OUT_DIR / "e1_unequal.csv"
 
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = Path("./output/data");
+    out = Path("../../output/data");
     out.mkdir(parents=True, exist_ok=True)
     # 首次写表头（四列）
     if not OUT_CSV.exists():

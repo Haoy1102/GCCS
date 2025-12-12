@@ -20,9 +20,9 @@ VGPU_WEIGHTS = {
 }.get(KAPPA, None)
 
 # 读写路径
-SEG_PATH = "./input/segments_base.csv"
-EDG_PATH = "./input/edges.csv"
-OUT_DIR  = Path("./output/data")
+SEG_PATH = "../../input/segments_base.csv"
+EDG_PATH = "../../input/edges.csv"
+OUT_DIR  = Path("../../output/data")
 OUT_CSV  = OUT_DIR / "e1_unequal_once.csv"
 
 
