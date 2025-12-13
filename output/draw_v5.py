@@ -15,7 +15,7 @@ BASELINE_CONST_Y = 300.0  # 当 BASELINE_MODE="constant" 时，水平线的 y �
 # === E1 图样式开关： "bar" 或 "line" ===
 # E1_STYLE = "bar"
 E1_STYLE = "line"
-E2_STYLE = "bar"
+E2_STYLE = "line"
 
 from pathlib import Path
 
@@ -25,14 +25,14 @@ from pathlib import Path
 # CSV_E3 = DATA_DIR / "e3_longtail.csv"
 # CSV_E4 = DATA_DIR / "e4_ablation.csv"
 # DATA_DIR = Path("data")
-DATA_DIR = Path("./data_bk/v4_1")
+DATA_DIR = Path("./data_bk/v5")
 CSV_E1_EQUAL = DATA_DIR / "e1_1_equal.csv"
 CSV_E1_EQUAL_LONGTAIL = DATA_DIR / "e1_2_equal_longtail.csv"  # 新增长尾数据文件
 CSV_E1_UNEQUAL = DATA_DIR / "e1_3_unequal.csv"
 CSV_E1_UNEQUAL_LONGTAIL = DATA_DIR / "e1_4_unequal_longtail.csv"  # 新增长尾数据文件
-CSV_E2_EQUAL = DATA_DIR / "e2_1.1_equal.csv"
+CSV_E2_EQUAL = DATA_DIR / "e2_1_equal.csv"
 CSV_E2_EQUAL_LONGTAIL = DATA_DIR / "e2_2_equal_longtail.csv"  # 新增长尾数据文件
-CSV_E2_UNEQUAL = DATA_DIR / "e2_3.1_unequal.csv"
+CSV_E2_UNEQUAL = DATA_DIR / "e2_3_unequal.csv"
 CSV_E2_UNEQUAL_LONGTAIL = DATA_DIR / "e2_4_unequal_longtail.csv"  # 新增长尾数据文件
 
 CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
@@ -40,7 +40,7 @@ CSV_E3 = DATA_DIR / "e3_longtail.csv"
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
 # OUT_DIR = Path("./figs")
-OUT_DIR = Path("./data_bk/fig/v4_1")
+OUT_DIR = Path("./data_bk/fig/v5")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # 方法重命名

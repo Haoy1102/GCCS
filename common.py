@@ -81,7 +81,13 @@ def adjust_cluster_rho_by_workload(segments: pd.DataFrame, cluster: List[Dict]) 
 # ---------- critical-path per task ----------
 def compute_crit_for_task(task_id: str, segments: pd.DataFrame, edges: pd.DataFrame, S_C: float, S_G_sum: float):
     segs = segments[segments['task_id']==task_id].copy()
-    segs['w'] = segs.apply(lambda r: (r['C_TFLOP']/S_C) if r['type']=='CPU' else (r['G_TFLOP']/S_G_sum), axis=1)
+    # NOTE: type 字段可能出现大小写差异，统一按 upper() 处理。
+    segs['w'] = segs.apply(
+        lambda r: (r['C_TFLOP']/S_C)
+        if str(r['type']).upper() == 'CPU'
+        else (r['G_TFLOP']/S_G_sum),
+        axis=1
+    )
     task_edges = edges[edges['task_id']==task_id]
     succ = defaultdict(list); pred = defaultdict(list); nodes=set(segs['seg_id'].astype(int).tolist())
     for _,e in task_edges.iterrows():
@@ -124,11 +130,15 @@ def schedule_on_server(server_name: str, segments: pd.DataFrame, edges: pd.DataF
         ready.sort(key=lambda x: priority_fn(x[0], x[1], {'server':srv,'task_struct':task_struct,'segments':segments}), reverse=True)
         tid,v,typ = ready.pop(0)
         row = segments[(segments['task_id']==tid)&(segments['seg_id']==v)].iloc[0]
-        if typ=='CPU':
-            dur = row['C_TFLOP']/S_C; start=T_cpu; end=start+dur; T_cpu=end
+        # 关键修复：CPU 也必须等待其前驱完成（否则会违背 DAG 约束）。
+        preds = task_struct[tid]['pred'][v]
+        rls = max([0.0] + [finish[(tid,u)] for u in preds]) if preds else 0.0
+        if str(typ).upper()=='CPU':
+            dur = float(row['C_TFLOP'])/float(S_C)
+            start = max(float(T_cpu), float(rls))
+            end = start + dur
+            T_cpu = end
         else:
-            preds = task_struct[tid]['pred'][v]
-            rls = max([0.0]+[finish[(tid,u)] for u in preds]) if preds else 0.0
             if gpu_queue_mode == "fixed" and tid in fixed_lane_for_task:
                 k = fixed_lane_for_task[tid]
                 start_k = max(T_k[k], rls)
@@ -166,7 +176,12 @@ def compute_global_ranks(segments: pd.DataFrame, edges: pd.DataFrame, cluster: L
     for s in cluster: all_q.extend(list(s['S_G_k']))
     avg_gpuq = float(np.mean(all_q)) if all_q else 1.0
     seg = segments.copy()
-    seg['w'] = seg.apply(lambda r: (r['C_TFLOP']/avg_cpu) if r['type']=='CPU' else (r['G_TFLOP']/avg_gpuq), axis=1)
+    seg['w'] = seg.apply(
+        lambda r: (r['C_TFLOP']/avg_cpu)
+        if str(r['type']).upper() == 'CPU'
+        else (r['G_TFLOP']/avg_gpuq),
+        axis=1
+    )
     ranks = {}; succ_all={}; pred_all={}
     for tid in seg['task_id'].unique():
         segs = seg[seg['task_id']==tid]

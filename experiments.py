@@ -1,10 +1,20 @@
 # experiments.py
 from __future__ import annotations
 import common
-from algo import GCCS as algo_gccs     # 若文件名小写请改成 from algo import gccs as algo_gccs
-from algo import HEFT as algo_heft
-from algo import Hydra as algo_hydra
-from algo import MRSA as algo_mrsa
+
+# 兼容两种工程布局：
+#  1) 你原本的 repo: algo/ 目录下放各算法实现
+#  2) 当前 notebook/脚本目录：直接放 GCCS.py/HEFT.py/Hydra.py/MRSA.py
+try:
+    from algo import GCCS as algo_gccs
+    from algo import HEFT as algo_heft
+    from algo import Hydra as algo_hydra
+    from algo import MRSA as algo_mrsa
+except Exception:  # pragma: no cover
+    import GCCS as algo_gccs
+    import HEFT as algo_heft
+    import Hydra as algo_hydra
+    import MRSA as algo_mrsa
 from typing import Iterable, Dict, List, Optional
 import numpy as np, random
 
@@ -41,19 +51,19 @@ def _format_rho_as_R(rho_value: float, segments) -> str:
     coef = rho_value / R if R > 0 else 0.0
     return f"{coef:g}R"
 
-def run_all_once_yield(segments, edges, *,
-                       rho,
-                       kappa: int,
-                       seed: int = 2025,
-                       heft_extra_comm_s: float = 0.04,
-                       enable_cross_comm: bool = True,
-                       enable_intra_comm: bool = True,
-                       vgpu_weights: Optional[List[float]] = None,
-                       # ===== 新增：为 long-tail 指定“用哪个分片来算 rho/构建集群” =====
-                       segments_for_rho = None,
-                       cluster_segments = None,
-                       cluster_factory_kwargs: Optional[dict] = None,
-                      ) -> Iterable[Dict]:
+def run_all_once_yield(
+    segments,
+    edges,
+    *,
+    rho,
+    kappa: int,
+    seed: int = 2025,
+    vgpu_weights: Optional[List[float]] = None,
+    # 兼容旧脚本参数（本项目实验假设通信开销为 0，因此这些参数会被忽略）
+    heft_extra_comm_s: float = 0.0,
+    enable_cross_comm: bool = False,
+    enable_intra_comm: bool = False,
+) -> Iterable[Dict]:
     np.random.seed(seed); random.seed(seed)
     rho_val = _resolve_rho(rho, segments)
     rho_str = _format_rho_as_R(rho_val, segments)
@@ -70,14 +80,15 @@ def run_all_once_yield(segments, edges, *,
     g_ms, _ = algo_gccs.run(segments, edges, cluster, seed=seed)
     yield {"rho": rho_str, "kappa": int(kappa), "method": "GCCS", "makespan": float(g_ms)}
 
-    # 2) HEFT：最终模拟阶段加入通信 + 常数，并保证不小于 GCCS*(1+gap)
+    # 2) HEFT（无通信开销）：任务贪心打包 + 单机 HEFT 列表调度
+    #    为兼容旧脚本，仍传入参数但在 HEFT 内会忽略。
     h_ms, _ = algo_heft.run(
-        segments, edges, cluster,
-        extra_comm_s=heft_extra_comm_s,
-        enable_cross_comm=enable_cross_comm,
-        enable_intra_comm=enable_intra_comm,
-        baseline_ms=g_ms,
-        min_gap_ratio=0.12
+        segments,
+        edges,
+        cluster,
+        extra_comm_s=float(heft_extra_comm_s),
+        enable_cross_comm=bool(enable_cross_comm),
+        enable_intra_comm=bool(enable_intra_comm),
     )
     yield {"rho": rho_str, "kappa": int(kappa), "method": "HEFT", "makespan": float(h_ms)}
 
@@ -88,10 +99,10 @@ def run_all_once_yield(segments, edges, *,
     # 4) MRSA
     m_ms, _ = algo_mrsa.run(
         segments, edges, cluster,
-        baseline_ms=g_ms,      # 用 GCCS 的 makespan 当基线
-        min_gap_ratio=0.06,    # 至少慢 6%
-        cpu_base_s=0.0,
-        gpu_base_s=0.01
+        # baseline_ms=g_ms,      # 用 GCCS 的 makespan 当基线
+        # min_gap_ratio=0.06,    # 至少慢 6%
+        # cpu_base_s=0.0,
+        # gpu_base_s=0.01
     )
     yield {"rho": rho_str, "kappa": int(kappa), "method": "MRSA", "makespan": float(m_ms)}
 

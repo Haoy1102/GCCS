@@ -96,8 +96,11 @@ def _schedule_on_server_mrsa(server_name: str,
         row = segments[(segments['task_id']==tid)&(segments['seg_id']==v)].iloc[0]
 
         if typ == 'CPU':
+            # 关键修复：CPU 也必须等待其前驱完成（否则会违背 DAG 约束）。
+            preds = task_struct[tid]['pred'].get(v, [])
+            release = max([0.0] + [finish[(tid, u)] for u in preds]) if preds else 0.0
             dur = float(row['C_TFLOP'])/S_C + float(cpu_base_s)
-            start = T_cpu
+            start = max(float(T_cpu), float(release))
             end   = start + dur
             T_cpu = end
         else:

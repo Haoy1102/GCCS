@@ -9,30 +9,29 @@ SEED = 2025
 HEFT_EXTRA_COMM_S = 0.04
 ENABLE_CROSS_COMM = True
 ENABLE_INTRA_COMM = True
-RHO_CHOICES = ["0.5R", "0.7R", "0.9R", "1.0R", "1.25R","1.5R","2.0R"]  # 也可换成具体数字或混用
-KAPPA_CHOICES = [4]
+RHO_CHOICES = ["1.0R","2.0R"]  # 也可换成具体数字或混用
+KAPPA_CHOICES = [1,2,3,4,5,6,7]
 
 SEG_PATH = "../../input/segments_base.csv"
 SEG_HEAVY_PATH = "../../input/segments_heavy.csv"
 EDG_PATH = "../../input/edges.csv"
 
 OUT_PATH = "../../output/data"
-OUT_FILE_NAME = "e1_1_equal.csv"
-OUT_LONGTAIL_FILE_NAME = "e1_2_equal_longtail.csv"
-OUT_HERE_FILE_NAME = "e1_3_unequal.csv"
-OUT_HERE_LONGTAIL_FILE_NAME = "e1_4_unequal_longtail.csv"
+OUT_FILE_NAME = "e2_1_equal.csv"
+OUT_LONGTAIL_FILE_NAME = "e2_2_equal_longtail.csv"
+OUT_HERE_FILE_NAME = "e2_3_unequal.csv"
+OUT_HERE_LONGTAIL_FILE_NAME = "e2_4_unequal_longtail.csv"
 
 
 # 为每个 κ 指定不均等 vGPU 权重（长度必须等于 κ；不要求和为 1，会在 common 内归一化）
 UNEQUAL_WEIGHTS = {
     1: [1.0],
     2: [0.3, 0.7],
-    # 3: [0.2,0.3,0.5],
+    3: [0.2,0.3,0.5],
     4: [0.1, 0.2, 0.3, 0.4],
-    # 5: [0.1, 0.1, 0.2, 0.2, 0.4],
-    # 6: [0.1, 0.1, 0.1, 0.2, 0.2, 0.3],
+    5: [0.1, 0.1, 0.2, 0.2, 0.4],
+    6: [0.1, 0.1, 0.1, 0.2, 0.2, 0.3],
     7: [0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3],
-    # 8: [0.03, 0.07, 0.10, 0.10, 0.10, 0.10, 0.20, 0.30],
 }
 
 def main():

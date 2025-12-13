@@ -1,143 +1,186 @@
-# algo/HEFT.py
-# HEFT: upward-rank -> EFT
-# 在“最终 EFT 模拟”时：release = max_u{ finish(u) + (comm if enabled) + extra_comm_s }
-# extra_comm_s 就是“在 makespan 计算阶段每条传输再加一个固定值”。
+"""HEFT baseline (no communication cost).
+
+This project models *zero communication overhead* across CPU/GPU and across servers.
+Therefore, this implementation removes all comm-time terms and focuses strictly on
+compute-time scheduling.
+
+To align with your experiment design (two-stage: task packing -> per-server DAG scheduling):
+
+Phase 1 (Task Packing, greedy):
+  - Order tasks by their maximum upward-rank.
+  - Assign each task to the server that minimizes the estimated completion level:
+        max(cpu_load + C_i/S_C, gpu_load + G_i/S_G)
+
+Phase 2 (Per-server HEFT list scheduling):
+  - For each server, run list scheduling on the union of assigned tasks.
+  - Node priority: upward-rank (global ranks computed on average resources).
+  - Resource choice:
+      * CPU node: single CPU timeline (serial)
+      * GPU node: choose vGPU queue that yields the earliest finish time (EFT)
+
+Return:
+  overall_makespan, per_server_makespan
+"""
+
 from __future__ import annotations
-from typing import List, Dict, Tuple, Optional
+
+from typing import Dict, List, Tuple
+
 import pandas as pd
+
 from common import compute_global_ranks
 
-# 链路与近似参数（可在 run() 覆盖）
-INTER_BW_GBPS = 12.5
-INTER_BASE_S  = 0.02
-INTRA_BW_GBPS = 24.0
-INTRA_BASE_S  = 0.003
-IO_COEF_CPU_GB = 0.02
-IO_COEF_GPU_GB = 0.05
 
-def _cpu_dur(s, row): return float(row['C_TFLOP']) / s['S_C']
-def _gpu_dur(s, k, row): return float(row['G_TFLOP']) / s['S_G_k'][k]
-
-def _edge_size_gb(prod_row: pd.Series, io_cpu: float, io_gpu: float) -> float:
-    if 'data_gb' in prod_row.index: return float(prod_row['data_gb'])
-    return (io_gpu if str(prod_row['type']).upper()=='GPU' else io_cpu) * float(
-        prod_row['G_TFLOP' if str(prod_row['type']).upper()=='GPU' else 'C_TFLOP']
+def _task_totals(segments: pd.DataFrame) -> pd.DataFrame:
+    return (
+        segments.groupby("task_id")
+        .agg(total_C=("C_TFLOP", "sum"), total_G=("G_TFLOP", "sum"))
+        .reset_index()
     )
 
-def _comm_time(src_srv: str, dst_srv: str, pred_kind: str, dst_kind: str,
-               prod_row: pd.Series, *, inter_bw_gbps: float, inter_base_s: float,
-               intra_bw_gbps: float, intra_base_s: float,
-               enable_cross: bool, enable_intra: bool,
-               io_cpu: float, io_gpu: float) -> float:
-    if not (enable_cross or enable_intra):
-        return 0.0
-    if src_srv != dst_srv:
-        if not enable_cross: return 0.0
-        size = _edge_size_gb(prod_row, io_cpu, io_gpu)
-        return inter_base_s + size / inter_bw_gbps
-    # 同机
-    if not enable_intra: return 0.0
-    if pred_kind == dst_kind: return 0.0
-    size = _edge_size_gb(prod_row, io_cpu, io_gpu)
-    return intra_base_s + size / intra_bw_gbps
 
-def run(segments: pd.DataFrame, edges: pd.DataFrame, cluster: List[Dict], *,
-        extra_comm_s: float = 0.04,                 # 你要求的“每条边额外加的常数”
-        enable_cross_comm: bool = True,             # 是否计入跨机通信
-        enable_intra_comm: bool = True,             # 是否计入同机 CPU<->GPU 通信
-        # 为了保证 HEFT 比 GCCS 慢：可选的基线约束（不喜欢可不传）
-        baseline_ms: Optional[float] = None,
-        min_gap_ratio: float = 0.12,                # baseline* (1+ratio)
-        inter_bw_gbps: float = INTER_BW_GBPS,
-        inter_base_s: float = INTER_BASE_S,
-        intra_bw_gbps: float = INTRA_BW_GBPS,
-        intra_base_s: float = INTRA_BASE_S,
-        io_coef_cpu_gb_per_tflop: float = IO_COEF_CPU_GB,
-        io_coef_gpu_gb_per_tflop: float = IO_COEF_GPU_GB
-       ) -> Tuple[float, Dict[str,float]]:
-    # 1) 先只用 upward-rank 决定队列（不掺通信）
+def _phase1_greedy_task_packing(
+    segments: pd.DataFrame,
+    cluster: List[Dict],
+    ranks: Dict[Tuple[str, int], float],
+) -> Dict[str, Dict]:
+    """Greedy task-to-server assignment (no comm)."""
+    totals = _task_totals(segments)
+
+    # Task priority: maximum upward-rank among its nodes
+    task_rank = {}
+    for tid in totals["task_id"].tolist():
+        sub = segments[segments["task_id"] == tid]
+        task_rank[tid] = max((ranks.get((tid, int(v)), 0.0) for v in sub["seg_id"].tolist()), default=0.0)
+
+    totals["task_rank"] = totals["task_id"].map(task_rank)
+    totals = totals.sort_values(["task_rank", "total_G", "total_C"], ascending=[False, False, False])
+
+    state = {s["name"]: {"cpu_load": 0.0, "gpu_load": 0.0, "tasks": []} for s in cluster}
+    srv_by_name = {s["name"]: s for s in cluster}
+
+    for r in totals.itertuples(index=False):
+        tid = str(r.task_id)
+        best_name = None
+        best_metric = float("inf")
+        for s in cluster:
+            name = s["name"]
+            # Use aggregated GPU capacity S_G (sum of vGPU queues) for packing estimate.
+            cpu_t = float(r.total_C) / float(s["S_C"])
+            gpu_t = float(r.total_G) / float(s["S_G"])
+            metric = max(state[name]["cpu_load"] + cpu_t, state[name]["gpu_load"] + gpu_t)
+            if metric < best_metric:
+                best_metric = metric
+                best_name = name
+
+        st = state[best_name]
+        srv = srv_by_name[best_name]
+        st["cpu_load"] += float(r.total_C) / float(srv["S_C"])
+        st["gpu_load"] += float(r.total_G) / float(srv["S_G"])
+        st["tasks"].append(tid)
+
+    return state
+
+
+def _phase2_heft_on_server(
+    server: Dict,
+    segments: pd.DataFrame,
+    edges: pd.DataFrame,
+    ranks: Dict[Tuple[str, int], float],
+    succ_all: Dict[str, Dict[int, List[int]]],
+    pred_all: Dict[str, Dict[int, List[int]]],
+    assigned_tasks: List[str],
+) -> float:
+    """List scheduling with priority=ranks and GPU choice by EFT (no comm)."""
+    if not assigned_tasks:
+        return 0.0
+
+    S_C = float(server["S_C"])
+    S_G_k = list(map(float, server["S_G_k"]))
+
+    cpu_avail = 0.0
+    gpu_avail = [0.0 for _ in S_G_k]
+    finish: Dict[Tuple[str, int], float] = {}
+
+    # Build per-node indegree for assigned tasks
+    indeg: Dict[Tuple[str, int], int] = {}
+    nodes: List[Tuple[str, int]] = []
+    for tid in assigned_tasks:
+        sub = segments[segments["task_id"] == tid]
+        for v in sub["seg_id"].astype(int).tolist():
+            indeg[(tid, v)] = len(pred_all.get(tid, {}).get(v, []))
+            nodes.append((tid, v))
+
+    ready = [n for n in nodes if indeg.get(n, 0) == 0]
+
+    while ready:
+        ready.sort(key=lambda tv: ranks.get(tv, 0.0), reverse=True)
+        tid, v = ready.pop(0)
+        row = segments[(segments["task_id"] == tid) & (segments["seg_id"] == v)].iloc[0]
+        typ = str(row["type"]).upper()
+
+        # release time from predecessors (no comm)
+        rls = 0.0
+        for u in pred_all.get(tid, {}).get(v, []):
+            rls = max(rls, finish[(tid, int(u))])
+
+        if typ == "CPU":
+            start = max(cpu_avail, rls)
+            dur = float(row["C_TFLOP"]) / S_C
+            end = start + dur
+            cpu_avail = end
+        else:
+            # GPU: choose queue that minimizes end time (EFT)
+            best_end = float("inf")
+            best_k = 0
+            for k, cap in enumerate(S_G_k):
+                start_k = max(gpu_avail[k], rls)
+                dur = float(row["G_TFLOP"]) / float(cap)
+                end_k = start_k + dur
+                if end_k < best_end:
+                    best_end = end_k
+                    best_k = k
+            gpu_avail[best_k] = best_end
+            end = best_end
+
+        finish[(tid, v)] = end
+
+        for w in succ_all.get(tid, {}).get(v, []):
+            key = (tid, int(w))
+            if key in indeg:
+                indeg[key] -= 1
+                if indeg[key] == 0:
+                    ready.append(key)
+
+    return float(max([cpu_avail] + gpu_avail))
+
+
+def run(
+    segments: pd.DataFrame,
+    edges: pd.DataFrame,
+    cluster: List[Dict],
+    *,
+    seed: int = 2025,
+    **_ignored,
+) -> Tuple[float, Dict[str, float]]:
+    """HEFT entrypoint (communication-free)."""
+    # ranks/succ/pred are computed on average resources (classic HEFT rank definition)
     ranks, succ_all, pred_all = compute_global_ranks(segments, edges, cluster)
 
-    # 2) 资源时间线
-    cpu_avail = {s['name']: 0.0 for s in cluster}
-    gpu_avail = {s['name']: [0.0 for _ in s['S_G_k']] for s in cluster}
+    server_state = _phase1_greedy_task_packing(segments, cluster, ranks)
 
-    # 3) 依赖初始化
-    indeg={}
-    for tid in segments['task_id'].unique():
-        preds=pred_all[tid]
-        nodes=set(segments[segments['task_id']==tid]['seg_id'].astype(int).tolist())
-        for v in nodes:
-            indeg[(tid,v)] = len(preds[v]) if v in preds else 0
-    ready=[(tid,v) for (tid,v),d in indeg.items() if d==0]
+    per: Dict[str, float] = {}
+    for s in cluster:
+        ms = _phase2_heft_on_server(
+            s,
+            segments,
+            edges,
+            ranks,
+            succ_all,
+            pred_all,
+            assigned_tasks=server_state[s["name"]]["tasks"],
+        )
+        per[s["name"]] = float(ms)
 
-    assigned={}; finish={}
-
-    # 4) EFT 模拟：在 release 把通信 + extra_comm_s 加进去
-    while ready:
-        ready.sort(key=lambda tv: ranks[(tv[0],tv[1])], reverse=True)
-        tid, v = ready.pop(0)
-        row = segments[(segments['task_id']==tid)&(segments['seg_id']==v)].iloc[0]
-        typ = str(row['type']).upper()
-
-        best=None
-        if typ=='CPU':
-            for s in cluster:
-                rls=0.0
-                for u in pred_all[tid].get(v,[]):
-                    ft_u = finish[(tid,u)]
-                    pred_kind, src_srv, _ = assigned[(tid,u)]
-                    prod_row = segments[(segments['task_id']==tid)&(segments['seg_id']==u)].iloc[0]
-                    comm = _comm_time(src_srv, s['name'], pred_kind, 'cpu', prod_row,
-                                      inter_bw_gbps=inter_bw_gbps, inter_base_s=inter_base_s,
-                                      intra_bw_gbps=intra_bw_gbps, intra_base_s=intra_base_s,
-                                      enable_cross=enable_cross_comm, enable_intra=enable_intra_comm,
-                                      io_cpu=io_coef_cpu_gb_per_tflop, io_gpu=io_coef_gpu_gb_per_tflop)
-                    rls = max(rls, ft_u + comm + extra_comm_s)
-                st = max(cpu_avail[s['name']], rls)
-                ft = st + _cpu_dur(s, row)
-                cand = (ft, st, 'cpu', s['name'], None)
-                if (best is None) or (cand < best): best = cand
-        else:
-            for s in cluster:
-                for k in range(len(s['S_G_k'])):
-                    rls=0.0
-                    for u in pred_all[tid].get(v,[]):
-                        ft_u = finish[(tid,u)]
-                        pred_kind, src_srv, _ = assigned[(tid,u)]
-                        prod_row = segments[(segments['task_id']==tid)&(segments['seg_id']==u)].iloc[0]
-                        comm = _comm_time(src_srv, s['name'], pred_kind, 'gpu', prod_row,
-                                          inter_bw_gbps=inter_bw_gbps, inter_base_s=inter_base_s,
-                                          intra_bw_gbps=intra_bw_gbps, intra_base_s=intra_base_s,
-                                          enable_cross=enable_cross_comm, enable_intra=enable_intra_comm,
-                                          io_cpu=io_coef_cpu_gb_per_tflop, io_gpu=io_coef_gpu_gb_per_tflop)
-                        rls = max(rls, ft_u + comm + extra_comm_s)
-                    st = max(gpu_avail[s['name']][k], rls)
-                    ft = st + _gpu_dur(s, k, row)
-                    cand = (ft, st, 'gpu', s['name'], k)
-                    if (best is None) or (cand < best): best = cand
-
-        ft, st, kind, sname, k = best
-        if kind=='cpu': cpu_avail[sname]=ft
-        else:           gpu_avail[sname][k]=ft
-        finish[(tid,v)]=ft
-        assigned[(tid,v)]=(kind, sname, k)
-
-        for w in succ_all[tid].get(v,[]):
-            indeg[(tid,w)] -= 1
-            if indeg[(tid,w)]==0:
-                ready.append((tid,w))
-
-    per = {s['name']: float(max([cpu_avail[s['name']]] + gpu_avail[s['name']])) for s in cluster}
     overall = max(per.values()) if per else 0.0
-
-    # 可选：强制 HEFT 不小于基线(=GCCS)的 (1+gap)
-    if baseline_ms is not None:
-        floor_ms = float(baseline_ms) * (1.0 + float(min_gap_ratio))
-        if overall < floor_ms:
-            scale = floor_ms / overall if overall > 0 else 1.0
-            overall *= scale
-            for n in list(per.keys()):
-                per[n] *= scale
-
     return float(overall), per
