@@ -30,13 +30,16 @@ CSV_E1_EQUAL = DATA_DIR / "e1_1_equal.csv"
 CSV_E1_EQUAL_LONGTAIL = DATA_DIR / "e1_2_equal_longtail.csv"  # 新增长尾数据文件
 CSV_E1_UNEQUAL = DATA_DIR / "e1_3_unequal.csv"
 CSV_E1_UNEQUAL_LONGTAIL = DATA_DIR / "e1_4_unequal_longtail.csv"  # 新增长尾数据文件
-CSV_E2_EQUAL = DATA_DIR / "e2_1.1_equal.csv"
+CSV_E2_EQUAL = DATA_DIR / "e2_1_equal.csv"
 CSV_E2_EQUAL_LONGTAIL = DATA_DIR / "e2_2_equal_longtail.csv"  # 新增长尾数据文件
-CSV_E2_UNEQUAL = DATA_DIR / "e2_3.1_unequal.csv"
+CSV_E2_UNEQUAL = DATA_DIR / "e2_2_unequal.csv"
 CSV_E2_UNEQUAL_LONGTAIL = DATA_DIR / "e2_4_unequal_longtail.csv"  # 新增长尾数据文件
+# CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
+CSV_E3 = DATA_DIR / "e3.csv"
+CSV_E3_LONGTAIL = DATA_DIR / "e3_longtail.csv"
 
-CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
-CSV_E3 = DATA_DIR / "e3_longtail.csv"
+
+
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
 # OUT_DIR = Path("./figs")
@@ -82,12 +85,12 @@ def _bar_grid(ax):
 
 
 def _csv_exists():
-    return all(Path(p).exists() for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E2, CSV_E3, CSV_E4])
+    return all(Path(p).exists() for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E4])
 
 
 def load_data():
     if not _csv_exists():
-        missing = [p for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E2, CSV_E3, CSV_E4] if not Path(p).exists()]
+        missing = [p for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E3_LONGTAIL, CSV_E4] if not Path(p).exists()]
         raise FileNotFoundError(f"缺少以下 CSV 文件：{missing}。请先放置数据再运行。")
 
     e1_equal = pd.read_csv(CSV_E1_EQUAL)
@@ -97,16 +100,18 @@ def load_data():
 
     e2_equal = pd.read_csv(CSV_E2_EQUAL)
     e2_unequal = pd.read_csv(CSV_E2_UNEQUAL)
-    e2_equal_longtail = pd.read_csv(CSV_E2_EQUAL_LONGTAIL)
-    e2_unequal_longtail = pd.read_csv(CSV_E2_UNEQUAL_LONGTAIL)
+    # e2_equal_longtail = pd.read_csv(CSV_E2_EQUAL_LONGTAIL)
+    # e2_unequal_longtail = pd.read_csv(CSV_E2_UNEQUAL_LONGTAIL)
 
-    e2 = pd.read_csv(CSV_E2)
+    # e2 = pd.read_csv(CSV_E2)
     e3 = pd.read_csv(CSV_E3)
+    e3_longtail = pd.read_csv(CSV_E3_LONGTAIL)
     e4 = pd.read_csv(CSV_E4)
 
     return (e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail,
-            e2_equal, e2_unequal, e2_equal_longtail, e2_unequal_longtail,
-            e2, e3, e4)
+            e2_equal, e2_unequal,
+            e3,e3_longtail,
+            e4)
 
 
 def _ordered_methods(cands):
@@ -306,7 +311,7 @@ def plot_e2_for_rho(df, rho, tag):
     plt.close(fig)
 
 
-def plot_e2(title: str, filename: str, df: pd.DataFrame):
+def plot_e3_H(title: str, filename: str, df: pd.DataFrame):
     """E2：按异构度 H 画 makespan 折线（数据列：H, method, makespan）"""
     fig, ax = plt.subplots(figsize=(7.6, 4.4))
 
@@ -400,7 +405,9 @@ def plot_e4(metric, title_suffix, filename, df):
 
 def main():
     (e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail,
-     e2_equal, e2_unequal, e2_equal_longtail, e2_unequal_longtail,  e2, e3, e4) = load_data()
+     e2_equal, e2_unequal,
+     e3, e3_longtail,
+     e4) = load_data()
 
     # for rho in sorted(e1_equal["rho"].unique()):
     #     plot_e1_for_rho(e1_equal, rho, "equal")
@@ -429,8 +436,8 @@ def main():
 
     all_rho_equal = sorted(e2_equal["rho"].unique())
     all_rho_unequal = sorted(e2_unequal["rho"].unique())
-    all_rho_equal_longtail = sorted(e2_equal_longtail["rho"].unique())
-    all_rho_unequal_longtail = sorted(e2_unequal_longtail["rho"].unique())
+    # all_rho_equal_longtail = sorted(e2_equal_longtail["rho"].unique())
+    # all_rho_unequal_longtail = sorted(e2_unequal_longtail["rho"].unique())
     for rho in all_rho_equal:
         plot_e2_for_rho(e2_equal,rho,"equal")
     for rho in all_rho_unequal:
@@ -441,18 +448,22 @@ def main():
     #     plot_e2_for_rho(e2_unequal_longtail, rho, "unequal_longtail")
 
 
-    if {"H", "method", "makespan"}.issubset(e2.columns):
-        plot_e2("E2: makespan vs heterogeneity H", "fig_E2_makespan.png", e2)
+    if {"H", "method", "makespan"}.issubset(e3.columns):
+        plot_e3_H("E2: makespan vs heterogeneity H", "fig_E3_heter_makespan.png", e3)
+    if {"H", "method", "makespan"}.issubset(e3_longtail.columns):
+        plot_e3_H("E2: makespan vs heterogeneity H", "fig_E3_longtail_makespan.png", e3_longtail)
     # if {"H","method","p99_multiplier"}.issubset(e2.columns):
     #     plot_e2("p99_multiplier", "E2: P99 multiplier vs heterogeneity H", "fig_E2_p99_multiplier.png", e2)
 
-    if {"dataset", "method", "makespan"}.issubset(e3.columns):
-        plot_e3("makespan", "makespan on Balanced vs LongTail", "fig_E3_makespan.png", e3)
+    # if {"dataset", "method", "makespan"}.issubset(e3.columns):
+    #     plot_e3("makespan", "makespan on Balanced vs LongTail", "fig_E3_makespan.png", e3)
+
     # if {"dataset","method","p99"}.issubset(e3.columns):
     #     plot_e3("p99", "P99 on Balanced vs LongTail", "fig_E3_p99.png", e3)
 
-    if {"variant", "makespan"}.issubset(e4.columns):
-        plot_e4("makespan", "makespan (ablation)", "fig_E4_makespan.png", e4)
+    # if {"variant", "makespan"}.issubset(e4.columns):
+    #     plot_e4("makespan", "makespan (ablation)", "fig_E4_makespan.png", e4)
+
     # if {"variant","p99"}.issubset(e4.columns):
     #     plot_e4("p99", "P99 (ablation)", "fig_E4_p99.png", e4)
 

@@ -1,4 +1,4 @@
-# run_multi_hetero.py
+# run_3_hetero.py
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd

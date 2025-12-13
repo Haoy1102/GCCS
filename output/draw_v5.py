@@ -35,7 +35,7 @@ CSV_E2_EQUAL_LONGTAIL = DATA_DIR / "e2_2_equal_longtail.csv"  # 新增长尾数�
 CSV_E2_UNEQUAL = DATA_DIR / "e2_3_unequal.csv"
 CSV_E2_UNEQUAL_LONGTAIL = DATA_DIR / "e2_4_unequal_longtail.csv"  # 新增长尾数据文件
 
-CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
+# CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
 CSV_E3 = DATA_DIR / "e3_longtail.csv"
 CSV_E4 = DATA_DIR / "e4_ablation.csv"
 
