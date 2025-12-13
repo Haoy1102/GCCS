@@ -59,6 +59,7 @@ def run_all_once_yield(
     kappa: int,
     seed: int = 2025,
     vgpu_weights: Optional[List[float]] = None,
+    cluster_num: int = 6,
     # 兼容旧脚本参数（本项目实验假设通信开销为 0，因此这些参数会被忽略）
     heft_extra_comm_s: float = 0.0,
     enable_cross_comm: bool = False,
@@ -69,7 +70,7 @@ def run_all_once_yield(
     rho_str = _format_rho_as_R(rho_val, segments)
 
     cluster = common.make_default_cluster(
-        num_servers=6, rho=rho_val, kappa=int(kappa),
+        num_servers=cluster_num, rho=rho_val, kappa=int(kappa),
         segments=segments, seed=seed
     )
     # unequal 的唯一差异：把 vGPU 配额改成不均等权重

@@ -16,6 +16,7 @@ BASELINE_CONST_Y = 300.0  # 当 BASELINE_MODE="constant" 时，水平线的 y �
 # E1_STYLE = "bar"
 E1_STYLE = "line"
 E2_STYLE = "bar"
+E4_STYLE = "bar"
 
 from pathlib import Path
 
@@ -37,10 +38,10 @@ CSV_E2_UNEQUAL_LONGTAIL = DATA_DIR / "e2_4_unequal_longtail.csv"  # 新增长尾
 # CSV_E2 = DATA_DIR / "e2_heterogeneity.csv"
 CSV_E3 = DATA_DIR / "e3.csv"
 CSV_E3_LONGTAIL = DATA_DIR / "e3_longtail.csv"
+CSV_E4_EQUAL = DATA_DIR / "e4_1_equal.csv"
+CSV_E4_UNEQUAL = DATA_DIR / "e4_2_unequal.csv"
 
-
-
-CSV_E4 = DATA_DIR / "e4_ablation.csv"
+CSV_E5_ABLATION = DATA_DIR / "e5_ablation.csv"
 
 # OUT_DIR = Path("./figs")
 OUT_DIR = Path("./data_bk/fig/v4_1")
@@ -85,12 +86,14 @@ def _bar_grid(ax):
 
 
 def _csv_exists():
-    return all(Path(p).exists() for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E4])
+    return all(Path(p).exists() for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E5_ABLATION])
 
 
 def load_data():
     if not _csv_exists():
-        missing = [p for p in [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E3_LONGTAIL, CSV_E4] if not Path(p).exists()]
+        missing = [p for p in
+                   [CSV_E1_EQUAL, CSV_E1_UNEQUAL, CSV_E3, CSV_E3_LONGTAIL, CSV_E4_EQUAL, CSV_E4_UNEQUAL, CSV_E5_ABLATION] if
+                   not Path(p).exists()]
         raise FileNotFoundError(f"缺少以下 CSV 文件：{missing}。请先放置数据再运行。")
 
     e1_equal = pd.read_csv(CSV_E1_EQUAL)
@@ -106,12 +109,15 @@ def load_data():
     # e2 = pd.read_csv(CSV_E2)
     e3 = pd.read_csv(CSV_E3)
     e3_longtail = pd.read_csv(CSV_E3_LONGTAIL)
-    e4 = pd.read_csv(CSV_E4)
+    e4_equal = pd.read_csv(CSV_E4_EQUAL)
+    e4_unequal = pd.read_csv(CSV_E4_UNEQUAL)
+    e5 = pd.read_csv(CSV_E5_ABLATION)
 
     return (e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail,
             e2_equal, e2_unequal,
-            e3,e3_longtail,
-            e4)
+            e3, e3_longtail,
+            e4_equal, e4_unequal,
+            e5)
 
 
 def _ordered_methods(cands):
@@ -144,6 +150,7 @@ def grouped_bar(ax, x_labels, series_dict, title, xlabel, ylabel):
     _bar_grid(ax)
     ax.legend(frameon=False)
 
+
 def plot_e1_for_kappa(df, kappa, tag):
     df_k = df[df["kappa"] == kappa].copy()
     rhos = sorted(df_k["rho"].unique())
@@ -154,7 +161,7 @@ def plot_e1_for_kappa(df, kappa, tag):
         fig, ax = plt.subplots(figsize=(7.6, 4.4))
         markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x', '8']
 
-        for i,m in enumerate(methods):
+        for i, m in enumerate(methods):
             d = df_k[df_k["method"] == m].sort_values("rho")
             ax.plot(
                 d["rho"].values,
@@ -200,6 +207,7 @@ def plot_e1_for_kappa(df, kappa, tag):
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     plt.close(fig)
+
 
 def plot_e1_for_rho(df, rho, tag):
     df_r = df[df["rho"] == rho].copy()
@@ -255,6 +263,7 @@ def plot_e1_for_rho(df, rho, tag):
     fig.savefig(out, dpi=200)
     plt.close(fig)
 
+
 def plot_e2_for_rho(df, rho, tag):
     df_r = df[df["rho"] == rho].copy()
     kappas = sorted(df_r["kappa"].unique())
@@ -264,7 +273,7 @@ def plot_e2_for_rho(df, rho, tag):
     if E2_STYLE == "line":
         # —— 折线图 ——（点白边、y 轴虚线网格、图例带框）
         fig, ax = plt.subplots(figsize=(7.6, 4.4))
-        for i,m in enumerate(methods):
+        for i, m in enumerate(methods):
             d = df_r[df_r["method"] == m].sort_values("kappa")
             ax.plot(
                 d["kappa"].values,
@@ -378,8 +387,64 @@ def plot_e3(metric, title_suffix, filename, df):
     fig.savefig(out, dpi=200)
     plt.close(fig)
 
+def plot_e4_cluster_num(df, tag):
+    cluster_nums = sorted(df["cluster_num"].unique())
+    methods = _ordered_methods(sorted(df["method"].unique()))
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x', '8']
 
-def plot_e4(metric, title_suffix, filename, df):
+    if E4_STYLE == "line":
+        # —— 折线图 ——（点白边、y 轴虚线网格、图例带框）
+        fig, ax = plt.subplots(figsize=(7.6, 4.4))
+        for i, m in enumerate(methods):
+            d = df[df["method"] == m].sort_values("cluster_num")
+            ax.plot(
+                d["cluster_num"].values,
+                d["makespan"].values,
+                marker=markers[i % len(markers)],
+                label=m,
+                color=COLORS.get(m, None),
+                linewidth=3.5,
+                alpha=(LINE_ALPHA if USE_ALPHA else 1.0),
+                markeredgewidth=0.8,
+            )
+        ax.set_xticks(cluster_nums)
+        ax.grid(True, axis="y", linestyle=":", linewidth=0.8, alpha=0.7)
+
+    else:
+        # —— 柱状图 ——（grouped_bar 风格一致）
+        # series[m] 的顺序必须与 cluster_nums 对齐
+        series = {
+            m: [
+                df[(df["method"] == m) & (df["cluster_num"] == cn)]["makespan"].values[0]
+                for cn in cluster_nums
+            ]
+            for m in methods
+        }
+        fig, ax = plt.subplots(figsize=(7.6, 4.4))
+        grouped_bar(
+            ax,
+            [str(cn) for cn in cluster_nums],
+            series,
+            title="",
+            xlabel="",
+            ylabel="",
+        )
+
+    ax.set_title(f"E4-{tag}: makespan vs cluster num")
+    ax.set_xlabel("cluster num")
+    ax.set_ylabel(_ylabel("makespan"))
+
+    # 图例带框
+    leg = ax.legend(frameon=True)
+    leg.get_frame().set_linewidth(0.8)
+
+    out = OUT_DIR / f"fig_E4_{tag}.png"
+    fig.tight_layout()
+    fig.savefig(out, dpi=200)
+    plt.close(fig)
+
+
+def plot_e5_ablation(metric, title_suffix, filename, df):
     fig, ax = plt.subplots(figsize=(7.6, 4.4))
     x_labels = list(df["variant"].values)
     x = np.arange(len(x_labels))
@@ -407,7 +472,8 @@ def main():
     (e1_equal, e1_unequal, e1_equal_longtail, e1_unequal_longtail,
      e2_equal, e2_unequal,
      e3, e3_longtail,
-     e4) = load_data()
+     e4_equal, e4_unequal,
+     e5_ablation) = load_data()
 
     # for rho in sorted(e1_equal["rho"].unique()):
     #     plot_e1_for_rho(e1_equal, rho, "equal")
@@ -439,14 +505,13 @@ def main():
     # all_rho_equal_longtail = sorted(e2_equal_longtail["rho"].unique())
     # all_rho_unequal_longtail = sorted(e2_unequal_longtail["rho"].unique())
     for rho in all_rho_equal:
-        plot_e2_for_rho(e2_equal,rho,"equal")
+        plot_e2_for_rho(e2_equal, rho, "equal")
     for rho in all_rho_unequal:
-        plot_e2_for_rho(e2_unequal,rho,"unequal")
+        plot_e2_for_rho(e2_unequal, rho, "unequal")
     # for rho in all_rho_equal_longtail:
     #     plot_e2_for_rho(e2_equal_longtail,rho,"equal_longtail")
     # for rho in all_rho_unequal_longtail:
     #     plot_e2_for_rho(e2_unequal_longtail, rho, "unequal_longtail")
-
 
     if {"H", "method", "makespan"}.issubset(e3.columns):
         plot_e3_H("E2: makespan vs heterogeneity H", "fig_E3_heter_makespan.png", e3)
@@ -458,14 +523,15 @@ def main():
     # if {"dataset", "method", "makespan"}.issubset(e3.columns):
     #     plot_e3("makespan", "makespan on Balanced vs LongTail", "fig_E3_makespan.png", e3)
 
+    if {"cluster_num", "method", "makespan"}.issubset(e4_equal.columns):
+        plot_e4_cluster_num(e4_equal,"equal")
+    if {"cluster_num", "method", "makespan"}.issubset(e4_unequal.columns):
+        plot_e4_cluster_num(e4_unequal,"unequal")
     # if {"dataset","method","p99"}.issubset(e3.columns):
     #     plot_e3("p99", "P99 on Balanced vs LongTail", "fig_E3_p99.png", e3)
 
-    # if {"variant", "makespan"}.issubset(e4.columns):
-    #     plot_e4("makespan", "makespan (ablation)", "fig_E4_makespan.png", e4)
-
-    # if {"variant","p99"}.issubset(e4.columns):
-    #     plot_e4("p99", "P99 (ablation)", "fig_E4_p99.png", e4)
+    if {"variant", "makespan"}.issubset(e5_ablation.columns):
+        plot_e5_ablation("makespan", "makespan (ablation)", "fig_E5_makespan.png", e5_ablation)
 
 
 if __name__ == "__main__":
