@@ -17,7 +17,7 @@ SEED = 2025
 H_LIST = [0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80,0.90,1.0]
 
 OUT_DIR = Path("../../output/data")
-OUT_FILE_NAME = "e3.csv"
+OUT_FILE_NAME = "e3_bk.csv"
 OUT_LONGTAIL_FILE_NAME = "e3_longtail.csv"
 
 UNEQUAL_WEIGHTS = {
