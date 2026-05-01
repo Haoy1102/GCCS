@@ -323,19 +323,20 @@ def plot_e2_for_rho(df, rho, tag):
 def plot_e3_H(title: str, filename: str, df: pd.DataFrame):
     """E2：按异构度 H 画 makespan 折线（数据列：H, method, makespan）"""
     fig, ax = plt.subplots(figsize=(7.6, 4.4))
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x', '8']
 
     methods = _ordered_methods(df["method"].unique())
-    for m in methods:
+    for i, m in enumerate(methods):
         d = df[df["method"] == m].sort_values("H")
         ax.plot(
             d["H"].values,
             d["makespan"].values,
-            marker="o",
+            marker=markers[i],
             label=m,
             color=COLORS.get(m, None),
-            linewidth=2,
+            linewidth=3.5,
             alpha=(LINE_ALPHA if USE_ALPHA else 1.0),
-            markeredgecolor="white",
+            # markeredgecolor="white",
             markeredgewidth=0.8,
         )
 
